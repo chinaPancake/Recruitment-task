@@ -31,9 +31,9 @@ class ToCrawl:
             if self.external.startswith('https') or self.external.startswith('http'):
                 self.count_external += 1
 
-        print('There is: ', len(self.all_links), " links")
-        print('There is: ', self.count_external, " external links")
-        print('There is: ', len(self.all_links) - self.count_external," internal links")
+        print(f'There is: {len(self.all_links)}, links')
+        print(f'There is: {self.count_external} external links')
+        print(f'There is: {len(self.all_links) - self.count_external} linternal links')
 
 if __name__ == "__main__":
     typer.run(ToCrawl)
