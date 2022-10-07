@@ -1,3 +1,5 @@
+import json
+
 import httplib2
 import typer
 import csv
@@ -36,27 +38,28 @@ class ToCrawl:
             if link.has_attr('href'):
                 self.all_links.append(link['href'])
 
+        self.counter = 0
         for link in self.all_links:
             if self.is_external_link(link=link):
                 self.count_external +=1
+            if link is not self.is_external_link(link=link):
+                if link.startswith('/'):
+                    print(link)
 
         print(f'There is: {len(self.all_links)}, links')
         print(f'There is: {self.count_external} external links')
         print(f'There is: {len(self.all_links) - self.count_external} linternal links')
+
+        self.save_to_file()
 
     def is_external_link(self, link: str) -> bool:
         return link.startswith('https') or link.startswith('http')
 
     def save_to_file(self):
         # save to CSV/JSON file with link, title, len(self.all_link), self.count_external, len(self.all_links) - self.count_external
-
-        # im doing resaerch on github and stackoverflow right now,
-
-        with open('csv_file.csv', 'w') as f:
-            writer = csv.writer(f)
-            writer.writerows(self.all_links)
-
-        pass
+        self.file = open('datas.json', 'w')
+        json.dump(self.all_links, self.file)
+        self.file.close()
 
 if __name__ == "__main__":
     typer.run(ToCrawl)
