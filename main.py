@@ -5,6 +5,7 @@ from httplib2 import RedirectLimit
 import typer
 import csv
 from bs4 import BeautifulSoup, SoupStrainer
+import urllib.parse
 
 
 # we have to crawl: link, title, number of internal links, number of times url was referenced by other pages
@@ -43,7 +44,7 @@ class ToCrawl:
             if self.is_external_link(link=link):
                 self.external_links.append(link)
             else:
-                self.internal_links.append(self.url + link)
+                self.internal_links.append(urllib.parse.urljoin(self.url, link))
 
         for link in self.internal_links:
             try:
@@ -85,6 +86,8 @@ class ToCrawl:
         self.file = open('datas.json', 'w')
         json.dump(self.internal_links, self.file)
         self.file.close()
+    def ensureProperUrl(self, url: str):
+        return url if url.startswith('http') or url.startswith('?') or url.startswith('/') else '/' + url
 
 
 if __name__ == "__main__":
