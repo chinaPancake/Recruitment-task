@@ -1,5 +1,8 @@
 import json
 
+import grequests
+import requests
+from lxml.html import fromstring
 import httplib2
 from httplib2 import RedirectLimit
 import typer
@@ -27,67 +30,89 @@ class ToCrawl:
         # all links array
         self.all_links = []
         self.all_titles = []
-        self.internal_links = []
-        self.external_links = []
+        visited_sites = set()
 
-        # get title from URL
-        for link in BeautifulSoup(self.response, 'html.parser', parseOnlyThese=SoupStrainer('title')):
-            self.all_titles.append(link.text)
-            print(self.all_titles)
+        links_to_visit = []
+        links_to_visit.append(self.url)
+        visited_sites.add(self.url)
 
-        for link in BeautifulSoup(self.response, 'html.parser', parseOnlyThese=SoupStrainer('a')):
-            if link.has_attr('href'):
-                self.all_links.append(link['href'])
+        lista_list_linkow = []
 
+        rs = (grequests.get(link) for link in links_to_visit)
+        rs_to_process = grequests.map(rs)
 
-        for link in self.all_links:
-            if self.is_external_link(link=link):
-                self.external_links.append(link)
-            else:
-                self.internal_links.append(urllib.parse.urljoin(self.url, link))
+        links = {
 
-        for link in self.internal_links:
+        }
+
+        while len(rs_to_process) > 0:
+            content = rs_to_process[0]
+            rs_to_process.pop(0)
+            url = links_to_visit.pop(0)
+
+            if url not in links:
+                links[url] = ("",0,0,0)
+
+            if content is None:
+                continue
+
             try:
-                self.go_to = httplib2.Http()
-                self.go_to_status, self.go_to_response = self.go_to.request(link)
-                for title in BeautifulSoup(self.go_to_response, 'html.parser', parseOnlyThese=SoupStrainer('title')):
+                link_data = list(links[url])
+                for title in BeautifulSoup(content.text, 'html.parser', parseOnlyThese=SoupStrainer('title')):
                     self.all_titles.append(title.text)
-                    print(self.all_titles)
-            except (RedirectLimit, httplib2.ServerNotFoundError, UnicodeError, httplib2.RelativeURIError):
-                print('redirection limit on', link)
+                    link_data[0] = title.text
 
+                internals, externals = self.extract_links(response=content.text)
+                for inter in internals:
+                    if inter not in links:
+                        links[url] = ("", 0, 0, 1)
+                    else:
+                        inter_link_data = list(links[inter])
+                        inter_link_data[-1] += 1
+                        links[inter] = tuple(inter_link_data)
 
-        self.save_to_file()
+                internals_not_visited = []
 
-            # for link in self.internal_links:
-            #     self.go_to = httplib2.Http()
-            #     self.go_to_status, self.go_to_response = self.go_to.request(link)
-            #     for title in BeautifulSoup(self.go_to_response, 'html.parser', parseOnlyThese=SoupStrainer('title')):
-            #         try:
-            #             self.all_titles.add(title.text)
-            #             print(self.all_titles)
-            #         except (RedirectLimit, httplib2.ServerNotFoundError, UnicodeError, httplib2.RelativeURIError):
-            #             print('redirection limit on', link)
+                for inter in internals:
+                    if inter not in visited_sites:
+                        internals_not_visited.append(inter)
+                        visited_sites.add(inter)
 
+                rs = (grequests.get(link) for link in internals_not_visited)
+                rs_to_process = rs_to_process + (grequests.map(rs))
+                links_to_visit = links_to_visit+internals_not_visited
 
+                link_data[1] = len(internals)
+                link_data[2] = len(externals)
+                print(link_data)
 
+            except (RedirectLimit, httplib2.ServerNotFoundError, UnicodeError, httplib2.RelativeURIError, TypeError):
+                print('redirection limit on', content)
 
-        print(f'There is: {len(self.all_links)}, links')
-        print(f'There is: {len(self.external_links)} external links')
-        print(f'There is: {len(self.internal_links)} internal links')
-        print(f'There is: {len(self.all_titles)} titles')
-        print(self.internal_links)
+        print(links)
 
     def is_external_link(self, link: str) -> bool:
         return link.startswith('https') or link.startswith('http')
 
     def save_to_file(self):
         # save to CSV/JSON file with link, title, len(self.all_link), self.count_external, len(self.all_links) - self.count_external
-        self.file = open('datas.json', 'w')
-        json.dump(self.internal_links, self.file)
-        self.file.close()
-    def ensureProperUrl(self, url: str):
-        return url if url.startswith('http') or url.startswith('?') or url.startswith('/') else '/' + url
+        pass
+
+    def extract_links(self, response: str):
+        all_links = []
+        for link in BeautifulSoup(response, 'html.parser', parseOnlyThese=SoupStrainer('a')):
+            if link.has_attr('href'):
+                all_links.append(link['href'])
+
+        external_links = []
+        internal_links = []
+        for link in all_links:
+            if self.is_external_link(link=link):
+                external_links.append(link)
+            else:
+                internal_links.append(urllib.parse.urljoin(self.url, link))
+
+        return internal_links, external_links
 
 
 if __name__ == "__main__":
