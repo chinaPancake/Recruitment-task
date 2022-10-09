@@ -1,6 +1,7 @@
 import json
 
 import httplib2
+from httplib2 import RedirectLimit
 import typer
 import csv
 from bs4 import BeautifulSoup, SoupStrainer
@@ -16,7 +17,6 @@ from bs4 import BeautifulSoup, SoupStrainer
 class ToCrawl:
     def __init__(self, url: str):
         # input url
-        self.external = None
         self.url = url
         self.http = httplib2.Http()
 
@@ -27,6 +27,7 @@ class ToCrawl:
         # all links array
         self.all_links = []
         self.all_titles = []
+        self.internal_links = []
 
         # get title from URL
         for link in BeautifulSoup(self.response, 'html.parser', parseOnlyThese=SoupStrainer('title')):
@@ -42,14 +43,24 @@ class ToCrawl:
         for link in self.all_links:
             if self.is_external_link(link=link):
                 self.count_external +=1
-            if link is not self.is_external_link(link=link):
+            else:
                 if link.startswith('/'):
-                    print(link)
+                    self.internal_links.append(self.url+link)
+
+        try:
+            for link in self.internal_links:
+                self.go_to = httplib2.Http()
+                self.go_to_status, self.go_to_response = self.go_to.request(link)
+                for title in BeautifulSoup(self.go_to_response, 'html.parser', parseOnlyThese=SoupStrainer('title')):
+                    self.all_titles.append(title.text)
+        except (RedirectLimit, httplib2.ServerNotFoundError, UnicodeError, httplib2.RelativeURIError):
+            print('redirection limit on', link)
+
 
         print(f'There is: {len(self.all_links)}, links')
         print(f'There is: {self.count_external} external links')
         print(f'There is: {len(self.all_links) - self.count_external} linternal links')
-
+        print(self.internal_links)
         self.save_to_file()
 
     def is_external_link(self, link: str) -> bool:
@@ -58,7 +69,7 @@ class ToCrawl:
     def save_to_file(self):
         # save to CSV/JSON file with link, title, len(self.all_link), self.count_external, len(self.all_links) - self.count_external
         self.file = open('datas.json', 'w')
-        json.dump(self.all_links, self.file)
+        json.dump(self.all_titles, self.file)
         self.file.close()
 
 if __name__ == "__main__":
