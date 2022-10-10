@@ -10,21 +10,31 @@ from bs4 import BeautifulSoup
 
 class Crawler:
     def __init__(self, base_url: str):
+        # input url
         self.base_url = base_url
         self.opened_connections = 0
 
+    # start async crawling
     async def crawl_site(self):
         urls_to_gather = [self.base_url]
+        # i use set to not have duplicate urls
         urls_visited = set(urls_to_gather)
+        # links dict
         links = { }
+        # start async connection
         async with httpx.AsyncClient() as client:
+            # while loop as long as urls_to_gether is not blank
             while len(urls_to_gather) > 0:
+                # gether links
                 gathered = await asyncio.gather(
                     *map(self.fetch_link, urls_to_gather, itertools.repeat(client), )
                 )
                 urls_to_gather.clear()
+                # for whole link in gathered links.
                 for wholeLink in gathered:
+                    # check links in wholeLink
                     for link in wholeLink.internal:
+                        # if link is not in urls_visited, add this link to urls_visited set, and urls_to_gather list
                         if link not in urls_visited:
                             urls_visited.add(link)
                             urls_to_gather.append(link)
@@ -32,8 +42,10 @@ class Crawler:
                         links[wholeLink.url] = wholeLink
                     else:
                         print('that shouldnt be there')
+        # go thourgh links dict
         for link in links:
             current = links[link]
+            # check every internal in current internal link
             for internal in current.internal:
                 links[internal].references_from += [link]
 
