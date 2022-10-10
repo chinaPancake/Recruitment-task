@@ -111,9 +111,7 @@ class ToCrawl:
         return link.startswith('https') or link.startswith('http')
 
     def save_to_file(self):
-        # save to CSV/JSON file with link, title, len(self.all_link), self.count_external, len(self.all_links) - self.count_external
         pass
-
 
 
     def extract_links(self, response: str):
@@ -132,7 +130,6 @@ class ToCrawl:
                 internal_links.append(urllib.parse.urljoin(self.url, link))
 
         return internal_links, external_links
-
 
 if __name__ == "__main__":
     typer.run(ToCrawl)
