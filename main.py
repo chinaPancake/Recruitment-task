@@ -22,62 +22,78 @@ class ToCrawl:
     def __init__(self, url: str):
         # input url
         self.url = url
-        self.http = httplib2.Http()
 
         # get request form URL
-        self.status, self.response = self.http.request(self.url)
+        self.response = grequests.get(self.url)
 
-        # all links array
-        self.all_links = []
+        # all arrays and sets
         self.all_titles = []
         visited_sites = set()
-
         links_to_visit = []
-        links_to_visit.append(self.url)
-        visited_sites.add(self.url)
-
-        lista_list_linkow = []
-
-        rs = (grequests.get(link) for link in links_to_visit)
-        rs_to_process = grequests.map(rs)
-
+        # links dict to save json/csv file
         links = {
 
         }
 
+
+        # append and add to array and set
+        links_to_visit.append(self.url)
+        visited_sites.add(self.url)
+
+        # asynchronous request
+        rs = (grequests.get(link) for link in links_to_visit)
+        # get array with all requests
+        rs_to_process = grequests.map(rs)
+
+        # while loop, work as long as request to process are bigger > 0
         while len(rs_to_process) > 0:
             content = rs_to_process[0]
+            # pop (delete) (0) from rs_to_process array
             rs_to_process.pop(0)
+            # change url value to links_to_visit and pop it
             url = links_to_visit.pop(0)
 
+            # if url not in links then we want to add blank tuple
             if url not in links:
                 links[url] = ("",0,0,0)
 
+            # if content is None we want to skip it and go to next content value
             if content is None:
                 continue
 
+            # try loop
             try:
+                # set link_data as list
                 link_data = list(links[url])
+                # get title from content page
                 for title in BeautifulSoup(content.text, 'html.parser', parseOnlyThese=SoupStrainer('title')):
+                    # append title into all_tittles
                     self.all_titles.append(title.text)
+                    # add page title into link_data list
                     link_data[0] = title.text
-
+                # start extract_links function
                 internals, externals = self.extract_links(response=content.text)
+                # get through every internal link
                 for inter in internals:
+                    # if internal link is not in links then add blank tuple
                     if inter not in links:
                         links[url] = ("", 0, 0, 1)
+                        # set inter_link_data into list, increment reference and set links as a tuple of inter_link_data
                     else:
                         inter_link_data = list(links[inter])
                         inter_link_data[-1] += 1
                         links[inter] = tuple(inter_link_data)
 
+                # not visited internal pages (content)
                 internals_not_visited = []
 
+                # another loop where we go through every internal link
                 for inter in internals:
                     if inter not in visited_sites:
                         internals_not_visited.append(inter)
                         visited_sites.add(inter)
 
+                # asynchronous request
                 rs = (grequests.get(link) for link in internals_not_visited)
                 rs_to_process = rs_to_process + (grequests.map(rs))
                 links_to_visit = links_to_visit+internals_not_visited
@@ -98,7 +114,10 @@ class ToCrawl:
         # save to CSV/JSON file with link, title, len(self.all_link), self.count_external, len(self.all_links) - self.count_external
         pass
 
+
+
     def extract_links(self, response: str):
+        # get all links at once
         all_links = []
         for link in BeautifulSoup(response, 'html.parser', parseOnlyThese=SoupStrainer('a')):
             if link.has_attr('href'):
